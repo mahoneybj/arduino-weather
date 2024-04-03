@@ -1,0 +1,5 @@
+{
+    "sketch": "weather-fetch\\weather-fetch.ino",
+    "board": "arduino:renesas_uno:unor4wifi",
+    "port": "COM3"
+}
