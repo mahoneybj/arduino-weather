@@ -3,16 +3,16 @@
 #include "IPAddress.h"
 #include "ArduinoJson.h"
 
-
 char ssid[] = "Pig";           // Your WiFi network SSID
 char pass[] = "TommyInnit72";  // Your WiFi network password
 const char* description;
 float temp;
+String time;
+JsonArray data;
 
 void setup() {
   Serial.begin(9600);
   delay(5000);
-
 
   while (!Serial)
     ;
@@ -36,19 +36,17 @@ void loop() {
 }
 
 void fetchJSON() {
-
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("Failed to connect to WiFi.");
-  }else{
+  } else {
     Serial.print("WiFi status: ");
     Serial.println(WiFi.status());
-}
+  }
 
   WiFiSSLClient client; // Change to WiFiClientSecure for HTTPS
 
-
   const char server[] = "api.weatherbit.io";
-  const char* resource = "/v2.0/current?lat=-45.8741&lon=170.5036&key=4f42db47030e4ba89eb302bc1274db51";
+  const char* resource = "/v2.0/forecast/hourly?lat=-45.8741&lon=170.5036&key=dd2f30b33a644bac846c95daa1975889&hours=6";
 
   if (client.connect(server, 443)) {  // Use port 443 for HTTPS
     client.print("GET ");
@@ -74,7 +72,7 @@ void fetchJSON() {
     }
 
     // Parse JSON response
-    StaticJsonDocument<512> doc;
+    DynamicJsonDocument doc(1024); // Adjust the size as per your JSON response size
     DeserializationError error = deserializeJson(doc, jsonResponse);
     if (error) {
       Serial.print("deserializeJson() failed: ");
@@ -83,14 +81,21 @@ void fetchJSON() {
     }
 
     // Extract data from JSON response
-    description = doc["data"][0]["weather"]["description"];
-    temp = doc["data"][0]["temp"];
-
-    // Print extracted data
-    Serial.print("Description: ");
-    Serial.println(description);
-    Serial.print("Temperature: ");
-    Serial.println(temp);
+    data = doc["data"];
+    for (int i = 0; i < data.size(); i++) {
+      JsonObject hour = data[i];
+      description = hour["weather"]["description"];
+      temp = hour["temp"];
+      // Extract time from datetime
+      time = hour["timestamp_local"].as<String>().substring(11);
+      // Print or store the extracted data for each hour
+      Serial.print("Time: ");
+      Serial.println(time);
+      Serial.print("Description: ");
+      Serial.println(description);
+      Serial.print("Temperature: ");
+      Serial.println(temp);
+    }
 
     // Close connection
     client.stop();
@@ -99,3 +104,4 @@ void fetchJSON() {
     Serial.println(client.getWriteError());
   }
 }
+
