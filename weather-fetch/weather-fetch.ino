@@ -1,14 +1,19 @@
-#include <WiFiS3.h>  // WiFi library for the UNO R4 WiFi
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <WiFiS3.h> 
 #include "WiFiSSLClient.h"
 #include "IPAddress.h"
 #include "ArduinoJson.h"
+#include "Arduino_LED_Matrix.h"
+#include <stdint.h>
+#include "symbols.h"  
 
+LiquidCrystal_I2C lcd(0x27,  16, 2);
 char ssid[] = "Pig";           // Your WiFi network SSID
 char pass[] = "TommyInnit72";  // Your WiFi network password
-const char* description;
-float temp;
-String time;
-JsonArray data;
+
+JsonArray dataHour;
+JsonArray dataDaily;
 
 void setup() {
   Serial.begin(9600);
@@ -26,24 +31,20 @@ void setup() {
   }
 
   Serial.println("Connected to WiFi");
+  lcd.init();
+  lcd.backlight();
 
   // Fetch JSON data
-  fetchJSON();
+  fetchHour();
+  fetchDaily();
 }
 
 void loop() {
   // Nothing to do here
 }
 
-void fetchJSON() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Failed to connect to WiFi.");
-  } else {
-    Serial.print("WiFi status: ");
-    Serial.println(WiFi.status());
-  }
-
-  WiFiSSLClient client; // Change to WiFiClientSecure for HTTPS
+void fetchHour() {
+  WiFiSSLClient client; 
 
   const char server[] = "api.weatherbit.io";
   const char* resource = "/v2.0/forecast/hourly?lat=-45.8741&lon=170.5036&key=dd2f30b33a644bac846c95daa1975889&hours=6";
@@ -81,13 +82,13 @@ void fetchJSON() {
     }
 
     // Extract data from JSON response
-    data = doc["data"];
-    for (int i = 0; i < data.size(); i++) {
-      JsonObject hour = data[i];
-      description = hour["weather"]["description"];
-      temp = hour["temp"];
+    dataHour = doc["data"];
+    for (int i = 0; i < dataHour.size(); i++) {
+      JsonObject hour = dataHour[i];
+      const char* description = hour["weather"]["description"];
+      float temp = hour["temp"];
       // Extract time from datetime
-      time = hour["timestamp_local"].as<String>().substring(11);
+      String time = hour["timestamp_local"].as<String>().substring(11);
       // Print or store the extracted data for each hour
       Serial.print("Time: ");
       Serial.println(time);
@@ -95,6 +96,16 @@ void fetchJSON() {
       Serial.println(description);
       Serial.print("Temperature: ");
       Serial.println(temp);
+
+      lcd.setCursor(0,0);
+      lcd.print("Time: " + time);
+      lcd.setCursor(0,1);
+      lcd.print("Temp: " + String(temp) + "c");
+      delay(2000);
+      lcd.clear();
+
+
+
     }
 
     // Close connection
@@ -104,4 +115,77 @@ void fetchJSON() {
     Serial.println(client.getWriteError());
   }
 }
+
+void fetchDaily() {
+  WiFiSSLClient client; // Change to WiFiClientSecure for HTTPS
+
+  const char server[] = "api.weatherbit.io";
+  const char* resource = "/v2.0/forecast/daily?lat=-45.8741&lon=170.5036&key=dd2f30b33a644bac846c95daa1975889&days=5";
+
+  if (client.connect(server, 443)) {  // Use port 443 for HTTPS
+    client.print("GET ");
+    client.print(resource);
+    client.println(" HTTP/1.1");
+    client.println("Host: api.weatherbit.io");
+    client.println("Connection: close");
+    client.println();  // End of HTTP headers
+
+    // Read response
+    bool headerPassed = false;
+    String jsonResponse = "";
+    while (client.connected()) {
+      String line = client.readStringUntil('\n');
+      // Check if we reached the end of the headers
+      if (line == "\r") {
+        headerPassed = true;
+      }
+      // If headers are passed, concatenate JSON data
+      if (headerPassed && line != "\r") {
+        jsonResponse += line;
+      }
+    }
+
+    // Parse JSON response
+    DynamicJsonDocument doc(1024); // Adjust the size as per your JSON response size
+    DeserializationError error = deserializeJson(doc, jsonResponse);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+
+    // Extract data from JSON response
+    dataDaily = doc["data"];
+    for (int i = 0; i < dataDaily.size(); i++) {
+      JsonObject day = dataDaily[i];
+      const char* description = day["weather"]["description"];
+      float maxTemp = day["max_temp"];
+      float minTemp = day["min_temp"];
+
+      // Extract time from datetime
+      String date = day["datetime"].as<String>();
+      // Print or store the extracted data for each hour
+      Serial.print("Day: ");
+      Serial.println(date);
+      Serial.print("Description: ");
+      Serial.println(description);
+      Serial.print("Max temp: ");
+      Serial.println(maxTemp);
+
+      lcd.setCursor(0,0);
+      lcd.print(date);
+      lcd.setCursor(0,1);
+      lcd.print("Temp:" + String(maxTemp) + " " + String(minTemp));
+      delay(2000);
+      lcd.clear();
+    }
+
+    // Close connection
+    client.stop();
+  } else {
+    Serial.println("Connection failed");
+    Serial.println(client.getWriteError());
+  }
+}
+
 
