@@ -19,8 +19,8 @@ int buttonStateH = 0;
 int buttonStateD = 0;
 
 #define LED_PIN 6
-#define LED_COUNT 65
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGB + NEO_KHZ400);
+#define LED_COUNT 10
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 JsonArray dataHour;
 JsonArray dataDaily;
@@ -32,9 +32,9 @@ void setup() {
 
   strip.begin();
   strip.show();
+  strip.setBrightness(50); // ~20% (max = 255)
 
-  while (!Serial)
-    ;
+  while (!Serial);
   // Connect to WiFi network
   Serial.print("Attempting to connect to network: ");
   Serial.println(ssid);
@@ -48,8 +48,6 @@ void setup() {
   matrix.loadFrame(wifi);
   lcd.init();
   lcd.backlight();
-  strip.setPixelColor(11, 255, 0, 255);
-  strip.show();
 
   currentWeather();
 }
