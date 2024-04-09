@@ -1,4 +1,5 @@
 #include <Wire.h>
+#include <Adafruit_NeoPixel.h>
 #include <LiquidCrystal_I2C.h>
 #include <WiFiS3.h> 
 #include "WiFiSSLClient.h"
@@ -17,6 +18,10 @@ const int buttonPinD = 3;
 int buttonStateH = 0;
 int buttonStateD = 0;
 
+#define LED_PIN 6
+#define LED_COUNT 65
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGB + NEO_KHZ400);
+
 JsonArray dataHour;
 JsonArray dataDaily;
 
@@ -24,6 +29,9 @@ void setup() {
   Serial.begin(9600);
   matrix.begin();
   delay(5000);
+
+  strip.begin();
+  strip.show();
 
   while (!Serial)
     ;
@@ -40,6 +48,8 @@ void setup() {
   matrix.loadFrame(wifi);
   lcd.init();
   lcd.backlight();
+  strip.setPixelColor(11, 255, 0, 255);
+  strip.show();
 
   currentWeather();
 }
