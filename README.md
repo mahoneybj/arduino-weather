@@ -9,7 +9,7 @@
 - LCD Screen
   I needed an LCD screen to easily display the time and date so the user can know when each forecast is for
 - LED strip
-  This was neccary so users can easily understand the weather forecast using light and color. (Useful for users with short vision problems)
+  This was necessary so users can easily understand the weather forecast using light and color. (Useful for users with short vision problems)
 
   # Problem
 - People are busy and they don't have time to give their full attention to a weather forecast on the TV or phone.  
