@@ -1,38 +1,45 @@
+#include "Arduino_LED_Matrix.h"
 #include <Wire.h>
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
 #include <LiquidCrystal_I2C.h>
 #include <WiFiS3.h> 
 #include "WiFiSSLClient.h"
-#include "IPAddress.h"
 #include "ArduinoJson.h"
-#include "Arduino_LED_Matrix.h"
-#include <stdint.h>
 #include "symbols.h"
 
-ArduinoLEDMatrix matrix;
-LiquidCrystal_I2C lcd(0x27,  16, 2);
-char ssid[] = "Pig";           // Your WiFi network SSID
-char pass[] = "TommyInnit72";  // Your WiFi network password
+//Led defines
+#define LED_PIN     6
+#define NUM_LEDS    8
+#define BRIGHTNESS  40
+#define LED_TYPE    WS2812B
+#define COLOR_ORDER GRB
+CRGB leds[NUM_LEDS];
+
+char ssid[] = "Pig";           // WiFi network SSID
+char pass[] = "TommyInnit72";  // WiFi network password
 const int buttonPinH = 2; 
 const int buttonPinD = 3; 
 int buttonStateH = 0;
 int buttonStateD = 0;
 
-#define LED_PIN 6
-#define LED_COUNT 10
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
-
+//Initlize JsonArrays for daily and hourly data
 JsonArray dataHour;
 JsonArray dataDaily;
+
+//Initlize R4 wifi built in matrix and LED screen
+ArduinoLEDMatrix matrix;
+LiquidCrystal_I2C lcd(0x27,  16, 2);
 
 void setup() {
   Serial.begin(9600);
   matrix.begin();
   delay(5000);
 
-  strip.begin();
-  strip.show();
-  strip.setBrightness(50); // ~20% (max = 255)
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.setBrightness(BRIGHTNESS);
+
+  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  FastLED.show();
 
   while (!Serial);
   // Connect to WiFi network
@@ -49,10 +56,12 @@ void setup() {
   lcd.init();
   lcd.backlight();
 
+  //Run current weather
   currentWeather();
 }
 
 void loop() {
+  //Define buttons for hourly and daily fetch
   buttonStateH = digitalRead(buttonPinH);
   buttonStateD = digitalRead(buttonPinD);
 
@@ -68,6 +77,7 @@ void loop() {
 void fetchHour() {
   WiFiSSLClient client; 
 
+  //Weather api server and path (Using Weatherbit.io)
   const char server[] = "api.weatherbit.io";
   const char* resource = "/v2.0/forecast/hourly?lat=-45.8741&lon=170.5036&key=dd2f30b33a644bac846c95daa1975889&hours=6";
 
@@ -113,7 +123,7 @@ void fetchHour() {
       String time = hour["timestamp_local"].as<String>().substring(11);
 
       int icon = hour["weather"]["code"];
-      // Print or store the extracted data for each hour
+      // Print data for each hour
       Serial.print(icon);
       Serial.print("Time: ");
       Serial.println(time);
@@ -122,6 +132,11 @@ void fetchHour() {
       Serial.print("Temperature: ");
       Serial.println(temp);
 
+      //Clear led
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+
+      //Switch case for each weather code
       switch (icon) {
         case 200 ... 299:
           matrix.loadFrame(lightning);
@@ -131,30 +146,88 @@ void fetchHour() {
         break;
         case 500:
           matrix.loadFrame(lightrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::White;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 501:
           matrix.loadFrame(lightrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Orange;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 502:
           matrix.loadFrame(heavyrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Red;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 510 ... 523:
           matrix.loadFrame(rainshower);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Yellow;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 600 ... 699:
           matrix.loadFrame(snow);
         break;
         case 700 ... 799:
           matrix.loadFrame(suncloud);
+          for (int i = 0; i < NUM_LEDS / 2; i++) {
+            leds[i] = CRGB::White;
+            leds[i + NUM_LEDS / 2] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 800:
           matrix.loadFrame(sun);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 801 ... 803:
           matrix.loadFrame(suncloud);
+          for (int i = 0; i < NUM_LEDS / 2; i++) {
+            leds[i] = CRGB::White;
+            leds[i + NUM_LEDS / 2] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 804:
           matrix.loadFrame(cloud);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = CRGB::White;
+          }
+
+          FastLED.show();
         break;
         default:
     // statements
@@ -172,8 +245,8 @@ void fetchHour() {
     client.stop();
   } else {
     Serial.println("Connection failed");
+    //Matrix for failed fetch
     matrix.loadFrame(nowifi);
-
     Serial.println(client.getWriteError());
   }
   currentWeather();
@@ -227,7 +300,7 @@ void fetchDaily() {
       int icon = day["weather"]["code"];
       // Extract time from datetime
       String date = day["datetime"].as<String>();
-      // Print or store the extracted data for each hour
+      // Print extracted data for each day
       Serial.print("Day: ");
       Serial.println(date);
       Serial.print("Description: ");
@@ -235,6 +308,8 @@ void fetchDaily() {
       Serial.print("Max temp: ");
       Serial.println(maxTemp);
 
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
       switch (icon) {
         case 200 ... 299:
           matrix.loadFrame(lightning);
@@ -244,30 +319,88 @@ void fetchDaily() {
         break;
         case 500:
           matrix.loadFrame(lightrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::White;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 501:
           matrix.loadFrame(lightrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Orange;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 502:
           matrix.loadFrame(heavyrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Red;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 510 ... 523:
           matrix.loadFrame(rainshower);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Yellow;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 600 ... 699:
           matrix.loadFrame(snow);
         break;
         case 700 ... 799:
           matrix.loadFrame(suncloud);
+          for (int i = 0; i < NUM_LEDS / 2; i++) {
+            leds[i] = CRGB::White;
+            leds[i + NUM_LEDS / 2] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 800:
           matrix.loadFrame(sun);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 801 ... 803:
           matrix.loadFrame(suncloud);
+          for (int i = 0; i < NUM_LEDS / 2; i++) {
+            leds[i] = CRGB::White;
+            leds[i + NUM_LEDS / 2] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 804:
           matrix.loadFrame(cloud);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = CRGB::White;
+          }
+
+          FastLED.show();
         break;
         default:
     // statements
@@ -275,7 +408,7 @@ void fetchDaily() {
       }
 
 
-
+      lcd.clear();
       lcd.setCursor(0,0);
       lcd.print(date);
       lcd.setCursor(0,1);
@@ -288,6 +421,7 @@ void fetchDaily() {
     client.stop();
   } else {
     Serial.println("Connection failed");
+    //Matrix for failed fetch
     matrix.loadFrame(nowifi);
     Serial.println(client.getWriteError());
   }
@@ -341,7 +475,7 @@ WiFiSSLClient client;
       String time = hour["timestamp_local"].as<String>().substring(11);
 
       int icon = hour["weather"]["code"];
-      // Print or store the extracted data for each hour
+      // Print fetched data
       Serial.print(icon);
       Serial.print("Time: ");
       Serial.println(time);
@@ -349,7 +483,8 @@ WiFiSSLClient client;
       Serial.println(description);
       Serial.print("Temperature: ");
       Serial.println(temp);
-
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
       switch (icon) {
         case 200 ... 299:
           matrix.loadFrame(lightning);
@@ -359,30 +494,88 @@ WiFiSSLClient client;
         break;
         case 500:
           matrix.loadFrame(lightrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::White;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 501:
           matrix.loadFrame(lightrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Orange;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 502:
           matrix.loadFrame(heavyrain);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Red;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 510 ... 523:
           matrix.loadFrame(rainshower);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            if (i % 2 == 0) {
+              leds[i] = CRGB::Yellow;
+            } else {
+              leds[i] = CRGB::Blue;
+            }
+          } 
+
+          FastLED.show();
         break;
         case 600 ... 699:
           matrix.loadFrame(snow);
         break;
         case 700 ... 799:
           matrix.loadFrame(suncloud);
+          for (int i = 0; i < NUM_LEDS / 2; i++) {
+            leds[i] = CRGB::White;
+            leds[i + NUM_LEDS / 2] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 800:
           matrix.loadFrame(sun);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 801 ... 803:
           matrix.loadFrame(suncloud);
+          for (int i = 0; i < NUM_LEDS / 2; i++) {
+            leds[i] = CRGB::White;
+            leds[i + NUM_LEDS / 2] = CRGB::Yellow;
+          }
+
+          FastLED.show();
         break;
         case 804:
           matrix.loadFrame(cloud);
+          for (int i = 0; i < NUM_LEDS; i++) {
+            leds[i] = CRGB::White;
+          }
+
+          FastLED.show();
         break;
         default:
     // statements
@@ -399,6 +592,7 @@ WiFiSSLClient client;
     client.stop();
   } else {
     Serial.println("Connection failed");
+    //Matrix for failed fetch
     matrix.loadFrame(nowifi);
     Serial.println(client.getWriteError());
   }
